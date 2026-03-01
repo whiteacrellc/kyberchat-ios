@@ -4,8 +4,15 @@ struct LoginView: View {
     @Binding var isLoggedIn: Bool
 
     @State private var username = ""
+    @State private var password = ""
     @State private var isLoading = false
     @State private var errorMessage: String?
+
+    private var canSubmit: Bool {
+        !username.trimmingCharacters(in: .whitespaces).isEmpty &&
+        !password.isEmpty &&
+        !isLoading
+    }
 
     var body: some View {
         VStack(spacing: 32) {
@@ -31,6 +38,8 @@ struct LoginView: View {
                     .textFieldStyle(.roundedBorder)
                     .autocorrectionDisabled()
 
+                PasswordFieldView(placeholder: "Password", text: $password)
+
                 if let error = errorMessage {
                     Text(error)
                         .font(.caption)
@@ -53,7 +62,7 @@ struct LoginView: View {
                     .padding(.vertical, 4)
                 }
                 .buttonStyle(.borderedProminent)
-                .disabled(username.trimmingCharacters(in: .whitespaces).isEmpty || isLoading)
+                .disabled(!canSubmit)
             }
 
             NavigationLink("Create Account") {
@@ -73,11 +82,12 @@ struct LoginView: View {
 
         do {
             _ = try await APIService.shared.validateLogin(
-                username: username.trimmingCharacters(in: .whitespaces)
+                username: username.trimmingCharacters(in: .whitespaces),
+                password: password
             )
             isLoggedIn = true
-        } catch APIError.userNotFound {
-            errorMessage = "No account found for that username."
+        } catch APIError.invalidCredentials {
+            errorMessage = "Invalid username or password."
         } catch {
             errorMessage = error.localizedDescription
         }
