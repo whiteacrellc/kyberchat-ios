@@ -17,6 +17,7 @@ struct CreateUserRequest: Encodable {
     let username: String
     let identity_key_public: String
     let registration_id: Int
+    let password: String
 }
 
 // MARK: - Errors
@@ -24,15 +25,15 @@ struct CreateUserRequest: Encodable {
 enum APIError: LocalizedError {
     case invalidResponse
     case serverError(String)
-    case userNotFound
+    case invalidCredentials
     case usernameTaken
 
     var errorDescription: String? {
         switch self {
-        case .invalidResponse:      return "Invalid server response."
-        case .serverError(let msg): return msg
-        case .userNotFound:         return "Username not found."
-        case .usernameTaken:        return "That username is already taken."
+        case .invalidResponse:          return "Invalid server response."
+        case .serverError(let msg):     return msg
+        case .invalidCredentials:       return "Invalid username or password."
+        case .usernameTaken:            return "That username is already taken."
         }
     }
 }
@@ -44,13 +45,17 @@ actor APIService {
 
     private let baseURL = "https://quantchat-server-1078066473760.us-central1.run.app"
 
-    /// Looks up a user by username. Throws `APIError.userNotFound` if the username doesn't exist.
-    func validateLogin(username: String) async throws -> UserData {
+    /// Validates a login by checking username and password.
+    /// Throws `APIError.invalidCredentials` if either is wrong or the account is deleted.
+    func validateLogin(username: String, password: String) async throws -> UserData {
         let url = URL(string: "\(baseURL)/validate_login")!
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try JSONEncoder().encode(["username": username])
+        request.httpBody = try JSONEncoder().encode([
+            "username": username,
+            "password": password
+        ])
 
         let (data, response) = try await URLSession.shared.data(for: request)
 
@@ -58,8 +63,8 @@ actor APIService {
             throw APIError.invalidResponse
         }
 
-        if http.statusCode == 404 {
-            throw APIError.userNotFound
+        if http.statusCode == 401 {
+            throw APIError.invalidCredentials
         }
 
         guard http.statusCode == 200 else {
@@ -77,7 +82,8 @@ actor APIService {
         uuid: String,
         username: String,
         identityKeyPublic: String,
-        registrationId: Int
+        registrationId: Int,
+        password: String
     ) async throws {
         let url = URL(string: "\(baseURL)/create_user")!
         var request = URLRequest(url: url)
@@ -87,7 +93,8 @@ actor APIService {
             user_uuid: uuid,
             username: username,
             identity_key_public: identityKeyPublic,
-            registration_id: registrationId
+            registration_id: registrationId,
+            password: password
         ))
 
         let (data, response) = try await URLSession.shared.data(for: request)
