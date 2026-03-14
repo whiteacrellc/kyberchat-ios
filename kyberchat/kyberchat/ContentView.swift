@@ -7,16 +7,24 @@
 
 import SwiftUI
 
+/// Root view. Observes `SessionManager` to drive navigation between
+/// the login stack and the main app. Auto-login is attempted on appear.
 struct ContentView: View {
-    @State private var isLoggedIn = false
+    @State private var session = SessionManager.shared
 
     var body: some View {
-        if isLoggedIn {
-            HomeView(isLoggedIn: $isLoggedIn)
-        } else {
-            NavigationStack {
-                LoginView(isLoggedIn: $isLoggedIn)
+        Group {
+            if session.isLoggedIn {
+                HomeView()
+            } else {
+                NavigationStack {
+                    LoginView()
+                }
             }
+        }
+        .environment(session)
+        .onAppear {
+            session.restoreSession()
         }
     }
 }
